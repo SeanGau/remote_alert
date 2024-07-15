@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block main %}
+<div class="container py-5">
+  <form method="post">
+    <div class="input-group my-3">
+      <span class="input-group-text">room id</span>
+      <input type="text" class="form-control" placeholder="room id" name="rid">
+    </div>    
+    <button class="btn btn-light btn-lg" type="submit" formaction="sender">SENDER</button>
+    <button class="btn btn-light btn-lg" type="submit" formaction="viewer">VIEWER</button>
+  </form>
+</div>
+{% endblock %}
+{% block script %}
+<script type="module">
+  import { v4 as uuidv4 } from 'https://jspm.dev/uuid'
+  let uuid = uuidv4()
+  $("input[name=rid]").val(uuid)
+</script>
+{% endblock %}

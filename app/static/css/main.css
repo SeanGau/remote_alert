@@ -1,0 +1,19 @@
+html, body, main {
+  height: 100%; }
+
+red, .red {
+  color: red; }
+
+#viewer-preview {
+  pointer-events: none; }
+
+@keyframes blink {
+  0% {
+    opacity: 0; }
+  50% {
+    opacity: 100%; } }
+
+#alert {
+  animation: blink .5s linear infinite alternate; }
+
+/*# sourceMappingURL=main.css.map */

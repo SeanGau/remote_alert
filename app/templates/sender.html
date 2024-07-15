@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block main %}
+<div class="container d-flex flex-column h-100 py-4">
+  <div class="row g-4">
+    <div class="col-md-4">
+      <form id="tmform" action="">
+        <div class="d-flex flex-wrap mb-2 align-items-center">
+          <label>倒數時間(秒)</label>
+          <div class="btn-group ms-2">
+            <button class="settbtn btn btn-outline-light btn-sm">600</button>
+            <button class="settbtn btn btn-outline-light btn-sm">300</button>
+            <button class="settbtn btn btn-outline-light btn-sm">60</button>
+          </div>
+        </div>
+        <input class="form-control mb-3" name="num" type="number" min="0" value="600" />
+        <button class="btn btn-danger" name="start">開始倒數</button>
+        <button class="btn btn-danger ms-2" name="sync">同步</button>
+        <span id="timer" class="ms-3">0</span>
+      </form>
+    </div>
+    <div class="col-md-4">
+      <form id="alertform" action="">
+        <label class="form-label">提醒文字</label>
+        <input class="form-control mb-3" name="message" type="text" value=":)" />
+        <button class="btn btn-danger" type="submit">傳送</button>
+      </form>
+    </div>
+    <div class="col-md-4">
+      <div class="d-grid gap-2">
+        <button class="alertbtn btn btn-danger">請靠近麥克風</button>
+        <button class="alertbtn btn btn-danger">請大聲一點</button>
+        <button class="alertbtn btn btn-danger">請小聲一點</button>
+        <button class="alertbtn btn btn-danger">請注意時間</button>
+      </div>
+    </div>
+  </div>
+  <hr>
+  <div><a class="btn btn-warning mb-3" target="_blank" href="/viewer/{{rid}}">viewer</a></div>
+  <div class="flex-grow-1 h-100">
+    <iframe id="viewer-preview" class="w-100 h-100 border" src="/viewer/{{rid}}" width="300" height="360"></iframe>
+  </div>
+</div>
+{% endblock %}
+{% block script %}
+<script>
+  let t2 = 0;
+  const socket = io();
+
+  socket.on('connect', function () {
+    socket.emit('join', { room: '{{rid}}' });
+  });
+
+  $("#tmform button.settbtn").on("click", function (e) {
+    e.preventDefault()
+    $("#tmform input[name=num]").val(Number($(this).text()))
+  })
+
+  $("#tmform button[name=sync]").on("click", function (e) {
+    e.preventDefault()
+    socket.emit('control', {
+      "name": "countdown",
+      "val": Number($("#timer").text()) / 1000
+    })
+  })
+
+  $("#tmform button[name=start]").on("click", function (e) {
+    e.preventDefault()
+    const val = $("#tmform input[name=num]").val()
+    socket.emit('control', {
+      "name": "countdown",
+      "val": val
+    })
+    t2 = Date.now() + Number(val) * 1000;
+  });
+
+  $("#alertform").on('submit', function (e) {
+    e.preventDefault()
+    socket.emit('control', {
+      "name": "alert",
+      "val": $("input[name=message]", $(this)).val()
+    })
+  });
+
+  $("button.alertbtn").on('click', function (e) {
+    e.preventDefault()
+    socket.emit('control', {
+      "name": "alert",
+      "val": $(this).text()
+    })
+  });
+
+  setInterval(function () {
+    const delta = t2 - Date.now();
+    if (delta <= 0) {
+      $("#timer").text(0);
+    } else {
+      $("#timer").text(delta);
+    }
+
+    if (delta < 60000) {
+      $("#timer").addClass("red");
+    } else {
+      $("#timer").removeClass("red");
+    }
+  }, 123);
+</script>
+{% endblock %}
