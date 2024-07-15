@@ -6,7 +6,18 @@ red, .red {
 }
 
 #viewer-preview {
-  pointer-events: none;
+  //pointer-events: none;
+}
+
+
+
+#t-style {
+  position: absolute;
+  z-index: 9999;
+  opacity: 0;
+  &:hover {
+    opacity: 1;
+  }
 }
 
 @keyframes blink {

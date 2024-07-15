@@ -1,6 +1,10 @@
 {% extends "base.html" %}
 {% block main %}
 <div class="container py-5 d-flex flex-column h-100">
+  <select id="t-style">
+    <option>clock</option>
+    <option>ss</option>
+  </select>
   <h4 id="clock" class="text-center"></h4>
   <div id="timer-box" class="flex-grow-1">
     <div id="timer" class="text-center">0</div>
@@ -12,6 +16,7 @@
 {% endblock %}
 {% block script %}
 <script>
+  let style = $('#t-style').val();
   let t2 = 0;
   const socket = io();
 
@@ -34,10 +39,13 @@
     const delta = t2 - Date.now();
     if (delta <=0) {
       $("#timer").text(0);
+    } else if (style === 'clock') {
+      const d = new Date(delta);
+      $("#timer").text(d.toISOString().substr(14, 5));
     } else {
       $("#timer").text(delta);
     }
-
+    
     if (delta < 60000) {
       $("#timer").addClass("red");
     } else {
@@ -46,6 +54,10 @@
     resize();
     $("#clock").text(new Date().toLocaleString());
   }, 123);
+
+  $('#t-style').change(function() {
+    style = $(this).val();
+  });
 
   socket.on('connect', function () {
     socket.emit('join', { room: '{{rid}}' });

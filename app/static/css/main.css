@@ -4,8 +4,12 @@ html, body, main {
 red, .red {
   color: red; }
 
-#viewer-preview {
-  pointer-events: none; }
+#t-style {
+  position: absolute;
+  z-index: 9999;
+  opacity: 0; }
+  #t-style:hover {
+    opacity: 1; }
 
 @keyframes blink {
   0% {
