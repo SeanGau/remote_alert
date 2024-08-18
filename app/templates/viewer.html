@@ -84,5 +84,37 @@
         t2 = Date.now() + Number(data['val']) * 1000
       }
     })
+    
+    // Wake Lock API integration
+    let wakeLock = null
+    
+    async function requestWakeLock() {
+      try {
+        wakeLock = await navigator.wakeLock.request('screen')
+        console.log('Wake Lock is active')
+      } catch (err) {
+        console.error(`${err.name}, ${err.message}`)
+      }
+    }
+    
+    // Request wake lock on page load
+    requestWakeLock()
+    
+    // Re-request wake lock on visibility change
+    document.addEventListener('visibilitychange', () => {
+      if (wakeLock !== null && document.visibilityState === 'visible') {
+        requestWakeLock()
+      }
+    })
+    
+    // Release wake lock on page unload
+    window.addEventListener('unload', () => {
+      if (wakeLock !== null) {
+        wakeLock.release().then(() => {
+          wakeLock = null
+          console.log('Wake Lock released')
+        })
+      }
+    })
   </script>
 {% endblock %}
