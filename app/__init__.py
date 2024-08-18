@@ -1,12 +1,30 @@
-from flask import Flask, render_template, session, request, abort, redirect
+from flask import Flask, render_template, session, request, abort, redirect, g
 from flask_socketio import SocketIO, join_room, leave_room, send, emit
 from sassutils.wsgi import SassMiddleware
-import random
+import random, sqlite3, datetime, json
+
+sqlite3.enable_shared_cache(True)
+sqlite3_db = 'file::memory:?cache=shared'
+conn = sqlite3.connect(sqlite3_db, uri=True)
+
+conn.execute('''
+             CREATE TABLE IF NOT EXISTS ra_rooms (
+             rid TEXT PRIMARY KEY,
+             current_countdown TEXT
+             )
+             ''')
+conn.commit()
 
 app = Flask(__name__)
 app.config.from_pyfile("config.py", silent=True)
 app.wsgi_app = SassMiddleware(app.wsgi_app, {'app': ('static/scss', 'static/css', '/static/css', True)})
 socketio = SocketIO(app)
+
+def get_db():
+  db = getattr(g, '_database', None)
+  if db is None:
+    db = g._database = sqlite3.connect(sqlite3_db)
+  return db
 
 def randomString():
   string = ""
@@ -46,8 +64,21 @@ def join(data):
   rid = data['room']
   session['room'] = rid
   join_room(rid)
+  db = get_db()
+  current_countdown = db.execute("SELECT current_countdown FROM ra_rooms WHERE rid = ?", (rid,)).fetchone()
+  if current_countdown:
+    current_countdown = json.loads(current_countdown[0])
+    sync_val = float(current_countdown.get('timestamp')) + float(current_countdown.get('val')) - datetime.datetime.now().timestamp()
+    if sync_val > 0:
+      print("join", current_countdown)
+      emit('control', {'name': 'countdown', 'val': sync_val}, to=rid)
 
 @socketio.on('control')
 def on_event(data):
+  data['timestamp'] = datetime.datetime.now().timestamp()
   print("control", data)
+  if data.get('name') == 'countdown':
+    db = get_db()
+    db.execute("INSERT OR REPLACE INTO ra_rooms (rid, current_countdown) VALUES (?, ?)", (session.get("room", None), json.dumps(data)))
+    db.commit()
   emit('control', data, to=session.get("room", None))
