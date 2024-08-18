@@ -1,15 +1,21 @@
-html, body, main {
+html,
+body,
+main {
   height: 100%;
 }
-red, .red {
+
+red,
+.red {
+  color: red;
+}
+
+.timesup {
   color: red;
 }
 
 #viewer-preview {
   //pointer-events: none;
 }
-
-
 
 #t-style {
   position: absolute;
