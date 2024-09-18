@@ -36,7 +36,7 @@
     resize()
     
     setInterval(function () {
-      const delta = t2 - Date.now()
+      const delta = Math.round(t2 - Date.now())
       if (delta <= 0) {
         if (!$('#timer').hasClass('timesup')) {
           const audio = new Audio('{{ url_for("static", filename="audio/smb_mariodie.mp3") }}')

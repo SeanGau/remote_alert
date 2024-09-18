@@ -1,5 +1,5 @@
 {% extends "base.html" %} {% block main %}
-<div class="container d-flex flex-column h-100 py-4">
+<div class="container d-flex flex-column h-100 py-3">
   <div class="row g-4">
     <div class="col-md-4">
       <form id="tmform" action="">
@@ -12,7 +12,7 @@
           </div>
         </div>
         <input class="form-control mb-3" name="num" type="number" min="0" value="600" />
-        <button class="btn btn-danger" name="start">開始倒數</button>
+        <button class="btn btn-danger" name="start" type="submit">開始倒數</button>
         <button class="btn btn-danger ms-2" name="sync" id="timer">0</button>
       </form>
     </div>
@@ -25,18 +25,20 @@
     </div>
     <div class="col-md-4">
       <div class="d-grid gap-2">
+        <button class="alertbtn btn btn-danger">請注意時間</button>
         <button class="alertbtn btn btn-danger">請靠近麥克風</button>
         <button class="alertbtn btn btn-danger">請大聲一點</button>
-        <button class="alertbtn btn btn-danger">請小聲一點</button>
-        <button class="alertbtn btn btn-danger">請注意時間</button>
       </div>
     </div>
   </div>
   <hr>
-  <div><a class="btn btn-warning mb-3" target="_blank" href="/viewer/{{rid}}">viewer</a></div>
+  <div class="d-flex align-items-center mb-3">
+    <a class="btn btn-warning me-3" target="_blank" href="/viewer/{{rid}}">viewer</a>
+  </div>
   <div class="flex-grow-1 h-100">
     <iframe id="viewer-preview" class="w-100 h-100 border" src="/viewer/{{rid}}" width="300" height="360"></iframe>
   </div>
+  <div class="text-center mt-2"><a href="https://github.com/SeanGau/remote_alert" target="_blank">View on Github</a></div>
 </div>
 {% endblock %} {% block script %}
 <script>
@@ -48,6 +50,13 @@
       room: '{{rid}}'
     });
   });
+    
+  socket.on('control', function (data) {
+    console.log('control', data)
+    if (data['name'] == 'countdown') {
+      t2 = Date.now() + data['val'] * 1000;
+    }
+  })
 
   $("#tmform button.settbtn").on("click", function(e) {
     e.preventDefault()
@@ -62,7 +71,7 @@
     })
   })
 
-  $("#tmform button[name=start]").on("click", function(e) {
+  $("#tmform").on("submit", function(e) {
     e.preventDefault()
     const val = $("#tmform input[name=num]").val()
     socket.emit('control', {
@@ -89,7 +98,7 @@
   });
 
   setInterval(function() {
-    const delta = t2 - Date.now();
+    const delta = Math.round(t2 - Date.now())
     if (delta <= 0) {
       $("#timer").text(0);
     } else {
