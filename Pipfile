@@ -4,11 +4,15 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-flask = "*"
-flask-socketio = "*"
 libsass = "*"
 gunicorn = "*"
 eventlet = "*"
+uvicorn = "*"
+jinja2 = "*"
+aiofiles = "*"
+python-multipart = "*"
+websockets = "*"
+fastapi = {extras = ["standard"], version = "*"}
 
 [dev-packages]
 

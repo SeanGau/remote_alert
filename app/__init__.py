@@ -1,84 +1,159 @@
-from flask import Flask, render_template, session, request, abort, redirect, g
-from flask_socketio import SocketIO, join_room, leave_room, send, emit
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from starlette.middleware.wsgi import WSGIMiddleware
 from sassutils.wsgi import SassMiddleware
 import random, sqlite3, datetime, json
+from typing import Dict, Set
+from contextlib import contextmanager
 
+# Database setup
 sqlite3.enable_shared_cache(True)
 sqlite3_db = 'file::memory:?cache=shared'
-conn = sqlite3.connect(sqlite3_db, uri=True)
+_db_connection = None  # Global connection holder
 
-conn.execute('''
-             CREATE TABLE IF NOT EXISTS ra_rooms (
-             rid TEXT PRIMARY KEY,
-             current_countdown TEXT
-             )
-             ''')
-conn.commit()
+def get_db_connection():
+    global _db_connection
+    if _db_connection is None:
+        _db_connection = sqlite3.connect(sqlite3_db, uri=True)
+    return _db_connection
 
-app = Flask(__name__)
-app.config.from_pyfile("config.py", silent=True)
-app.wsgi_app = SassMiddleware(app.wsgi_app, {'app': ('static/scss', 'static/css', '/static/css', True)})
-socketio = SocketIO(app)
+# FastAPI app setup
+app = FastAPI()
 
+# Call init_db() during startup
+@app.on_event("startup")
+async def startup_event():
+    conn = get_db_connection()
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS ra_rooms (
+        rid TEXT PRIMARY KEY,
+        current_countdown TEXT
+        )
+    ''')
+    conn.commit()
+    print("Database initialized")
+
+# Add shutdown event to properly close the connection
+@app.on_event("shutdown")
+async def shutdown_event():
+    global _db_connection
+    if _db_connection is not None:
+        _db_connection.close()
+        _db_connection = None
+
+# Templates setup
+templates = Jinja2Templates(directory="app/templates")
+
+# Serve static files
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
+
+# SASS Middleware setup
+sass_app = WSGIMiddleware(SassMiddleware(
+    app,
+    {'app': ('static/scss', 'static/css', '/static/css', True)}
+))
+
+# Database connection management
+@contextmanager
 def get_db():
-  db = getattr(g, '_database', None)
-  if db is None:
-    db = g._database = sqlite3.connect(sqlite3_db)
-  return db
+    conn = get_db_connection()
+    try:
+        yield conn
+    finally:
+        # Don't close the connection, just commit if needed
+        conn.commit()
+
+# WebSocket connection manager
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: Dict[str, Set[WebSocket]] = {}
+
+    async def connect(self, websocket: WebSocket, room: str):
+        await websocket.accept()
+        if room not in self.active_connections:
+            self.active_connections[room] = set()
+        self.active_connections[room].add(websocket)
+
+    def disconnect(self, websocket: WebSocket, room: str):
+        if room in self.active_connections:
+            self.active_connections[room].discard(websocket)
+            if not self.active_connections[room]:
+                del self.active_connections[room]
+
+    async def broadcast_to_room(self, message: dict, room: str):
+        if room in self.active_connections:
+            for connection in self.active_connections[room]:
+                await connection.send_json(message)
+
+manager = ConnectionManager()
 
 def randomString():
-  string = ""
-  stringList = ["data", "analysis", "algorithm", "compute", "storage", "encryption", "network", "cybersecurity", "software", "hardware",
-  "database", "cloud", "API", "server", "programming", "code", "interface", "protocol", "machinelearning", "artificialintelligence",
-  "internet", "protocol", "analytics", "biometrics", "authentication", "authorization", "firewall", "hacking", "phishing", "malware",
-  "virus", "blockchain", "IoT", "sensor", "streaming", "backup", "recovery", "virtualization", "interface", "repository", "debugging",
-  "scripting", "frontend", "backend", "responsive", "scalability", "usability", "open-source", "agile", "metadata", "API",
-  "automation", "bigdata", "chatbot", "cluster", "dashboard", "debug", "DevOps", "endpoint", "framework", "git", "GUI", "hash",
-  "HTML", "HTTP", "HTTPS", "IDE", "Java", "JavaScript", "JSON", "kernel", "Linux", "machinecode", "microservices", "mobile", "modem",
-  "module", "node", "objectoriented", "paradigm", "query", "router", "SDK", "SQL", "stack", "syntax", "token", "UNIX", "UX", "VPN",
-  "web", "XML", "YAML"]
+    stringList = ["data", "analysis", "algorithm", "compute", "storage", "encryption", "network", "cybersecurity", "software", "hardware",
+    "database", "cloud", "API", "server", "programming", "code", "interface", "protocol", "machinelearning", "artificialintelligence",
+    "internet", "protocol", "analytics", "biometrics", "authentication", "authorization", "firewall", "hacking", "phishing", "malware",
+    "virus", "blockchain", "IoT", "sensor", "streaming", "backup", "recovery", "virtualization", "interface", "repository", "debugging",
+    "scripting", "frontend", "backend", "responsive", "scalability", "usability", "open-source", "agile", "metadata", "API",
+    "automation", "bigdata", "chatbot", "cluster", "dashboard", "debug", "DevOps", "endpoint", "framework", "git", "GUI", "hash",
+    "HTML", "HTTP", "HTTPS", "IDE", "Java", "JavaScript", "JSON", "kernel", "Linux", "machinecode", "microservices", "mobile", "modem",
+    "module", "node", "objectoriented", "paradigm", "query", "router", "SDK", "SQL", "stack", "syntax", "token", "UNIX", "UX", "VPN",
+    "web", "XML", "YAML"]
+    
+    return "".join(random.choice(stringList) for _ in range(3)).lower()
 
-  for i in range(3):
-    string += stringList[random.randint(0, len(stringList))]
-  return string.lower()
+# Routes
+@app.get("/")
+async def index():
+    return RedirectResponse(url=f'/sender/{randomString()}')
 
-@app.route('/')
-def index():
-  return redirect(f'/sender/{randomString()}')
+@app.get("/viewer/{rid}")
+async def viewer(rid: str, request: Request):
+    if not rid:
+        raise HTTPException(status_code=403)
+    return templates.TemplateResponse("viewer.html", {"request": request, "rid": rid})
 
-@app.route('/viewer/<rid>')
-def viewer(rid):
-  if not rid:
-    return abort(403)
-  return render_template('viewer.html', rid = rid)  
-  
-@app.route('/sender/<rid>')
-def sender(rid):
-  if not rid:
-    return abort(403)
-  return render_template('sender.html', rid = rid)  
+@app.get("/sender/{rid}")
+async def sender(rid: str, request: Request):
+    if not rid:
+        raise HTTPException(status_code=403)
+    return templates.TemplateResponse("sender.html", {"request": request, "rid": rid})
 
+# WebSocket endpoints
+@app.websocket("/ws/{rid}")
+async def websocket_endpoint(websocket: WebSocket, rid: str):
+    await manager.connect(websocket, rid)
+    
+    try:
+        # Send current countdown on join
+        with get_db() as db:
+            current_countdown = db.execute(
+                "SELECT current_countdown FROM ra_rooms WHERE rid = ?", 
+                (rid,)
+            ).fetchone()
+            
+            if current_countdown:
+                current_countdown = json.loads(current_countdown[0])
+                sync_val = float(current_countdown.get('timestamp')) + float(current_countdown.get('val')) - datetime.datetime.now().timestamp()
+                if sync_val > 0:
+                    await websocket.send_json({
+                        "name": "countdown",
+                        "val": sync_val
+                    })
 
-@socketio.on('join')
-def join(data):
-  rid = data['room']
-  session['room'] = rid
-  join_room(rid)
-  db = get_db()
-  current_countdown = db.execute("SELECT current_countdown FROM ra_rooms WHERE rid = ?", (rid,)).fetchone()
-  if current_countdown:
-    current_countdown = json.loads(current_countdown[0])
-    sync_val = float(current_countdown.get('timestamp')) + float(current_countdown.get('val')) - datetime.datetime.now().timestamp()
-    if sync_val > 0:
-      print("join", current_countdown)
-      emit('control', {'name': 'countdown', 'val': sync_val}, to=rid)
-
-@socketio.on('control')
-def on_event(data):
-  data['timestamp'] = datetime.datetime.now().timestamp()
-  print("control", data)
-  if data.get('name') == 'countdown':
-    db = get_db()
-    db.execute("INSERT OR REPLACE INTO ra_rooms (rid, current_countdown) VALUES (?, ?)", (session.get("room", None), json.dumps(data)))
-    db.commit()
-  emit('control', data, to=session.get("room", None))
+        while True:
+            data = await websocket.receive_json()
+            data['timestamp'] = datetime.datetime.now().timestamp()
+            
+            if data.get('name') == 'countdown':
+                with get_db() as db:
+                    db.execute(
+                        "INSERT OR REPLACE INTO ra_rooms (rid, current_countdown) VALUES (?, ?)",
+                        (rid, json.dumps(data))
+                    )
+                    db.commit()
+            
+            await manager.broadcast_to_room(data, rid)
+            
+    except WebSocketDisconnect:
+        manager.disconnect(websocket, rid)

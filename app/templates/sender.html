@@ -43,62 +43,61 @@
 {% endblock %} {% block script %}
 <script>
   let t2 = 0;
-  const socket = io();
+  const socket = new WebSocket(`ws://${window.location.host}/ws/{{rid}}`);
 
-  socket.on('connect', function() {
-    socket.emit('join', {
-      room: '{{rid}}'
-    });
-  });
+  socket.onopen = () => {
+    console.log('Connected to WebSocket');
+  };
     
-  socket.on('control', function (data) {
-    console.log('control', data)
+  socket.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    console.log('control', data);
     if (data['name'] == 'countdown') {
       t2 = Date.now() + data['val'] * 1000;
     }
-  })
+  };
 
   $("#tmform button.settbtn").on("click", function(e) {
-    e.preventDefault()
-    $("#tmform input[name=num]").val(Number($(this).text()))
-  })
+    e.preventDefault();
+    $("#tmform input[name=num]").val(Number($(this).text()));
+  });
 
   $("#tmform button[name=sync]").on("click", function(e) {
-    e.preventDefault()
-    socket.emit('control', {
+    e.preventDefault();
+    socket.send(JSON.stringify({
       "name": "countdown",
       "val": Number($("#timer").text()) / 1000
-    })
-  })
+    }));
+  });
 
   $("#tmform").on("submit", function(e) {
-    e.preventDefault()
-    const val = $("#tmform input[name=num]").val()
-    socket.emit('control', {
+    e.preventDefault();
+    const val = $("#tmform input[name=num]").val();
+    socket.send(JSON.stringify({
       "name": "countdown",
       "val": val
-    })
+    }));
     t2 = Date.now() + Number(val) * 1000;
   });
 
   $("#alertform").on('submit', function(e) {
-    e.preventDefault()
-    socket.emit('control', {
+    e.preventDefault();
+    socket.send(JSON.stringify({
       "name": "alert",
       "val": $("input[name=message]", $(this)).val()
-    })
+    }));
   });
 
   $("button.alertbtn").on('click', function(e) {
-    e.preventDefault()
-    socket.emit('control', {
+    e.preventDefault();
+    socket.send(JSON.stringify({
       "name": "alert",
       "val": $(this).text()
-    })
+    }));
   });
 
   setInterval(function() {
-    const delta = Math.round(t2 - Date.now())
+    const delta = Math.round(t2 - Date.now());
     if (delta <= 0) {
       $("#timer").text(0);
     } else {
