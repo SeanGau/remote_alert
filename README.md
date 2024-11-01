@@ -20,4 +20,4 @@ This is a countdown timer that can be remotely controlled via WebSocket and also
 # Self Host
 1. setup enviroment with pipenv (`pipenv sync`)
 2. add `app/config.py`
-3. `pipenv run flask run`
+3. `pipenv run fastapi run app`
