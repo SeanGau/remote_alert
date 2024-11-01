@@ -43,7 +43,8 @@
 {% endblock %} {% block script %}
 <script>
   let t2 = 0;
-  const socket = new WebSocket(`ws://${window.location.host}/ws/{{rid}}`);
+  const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const socket = new WebSocket(`${wsProtocol}//${window.location.host}/ws/{{rid}}`);
 
   socket.onopen = () => {
     console.log('Connected to WebSocket');
