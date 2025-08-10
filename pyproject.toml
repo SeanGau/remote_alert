@@ -1,0 +1,11 @@
+[project]
+name = "remote-alert"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi[standard]>=0.116.1",
+    "libsass>=0.23.0",
+    "setuptools>=80.9.0",
+]
