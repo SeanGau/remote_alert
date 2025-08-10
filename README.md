@@ -18,6 +18,6 @@ This is a countdown timer that can be remotely controlled via WebSocket and also
 4. Start the timer on the Sender!
 
 # Self Host
-1. setup enviroment with pipenv (`pipenv sync`)
+1. setup environment with uv (`uv sync`)
 2. add `app/config.py`
-3. `pipenv run fastapi run app`
+3. `uv run fastapi run app`
