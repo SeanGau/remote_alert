@@ -2,9 +2,8 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Requ
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from starlette.middleware.wsgi import WSGIMiddleware
-from sassutils.wsgi import SassMiddleware
 import random, sqlite3, datetime, json
+import sass
 from typing import Dict, Set
 from contextlib import contextmanager
 
@@ -50,10 +49,11 @@ templates = Jinja2Templates(directory="app/templates")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 # SASS Middleware setup
-sass_app = WSGIMiddleware(SassMiddleware(
-    app,
-    {'app': ('static/scss', 'static/css', '/static/css', True)}
-))
+with open("app/static/scss/main.scss", "r") as f:
+    scss_content = f.read()
+    compiled_css = sass.compile(string=scss_content)
+    with open("app/static/css/main.css", "w") as f:
+        f.write(compiled_css)
 
 # Database connection management
 @contextmanager
@@ -104,8 +104,8 @@ def randomString():
 
 # Routes
 @app.get("/")
-async def index():
-    return RedirectResponse(url=f'/sender/{randomString()}')
+async def index(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request, "rid": randomString()})
 
 @app.get("/viewer/{rid}")
 async def viewer(rid: str, request: Request):
